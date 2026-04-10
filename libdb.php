@@ -6,7 +6,7 @@ $host = "localhost";
 $user = "root";
 $pass = "";
 // change this to your library database name
-$db   = "library_db"; 
+$db = "library_db";
 
 $conn = new mysqli($host, $user, $pass, $db);
 

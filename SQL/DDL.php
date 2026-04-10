@@ -1,63 +1,55 @@
 <?php
-// STEP 1: CONNECT
-$conn = mysqli_connect("localhost", "root", "");
+$conn = mysqli_connect("localhost", "root", "", "library1");
 
-if (!$conn) {
-    die("Connection Failed");
-}
+// RESET TABLE (optional but best for now)
+mysqli_query($conn, "DROP TABLE IF EXISTS student");
 
-// STEP 2: CREATE DATABASE
-mysqli_query($conn, "CREATE DATABASE IF NOT EXISTS student_db");
-
-// STEP 3: SELECT DATABASE
-mysqli_select_db($conn, "student_db");
-
-// STEP 4: CREATE TABLE
-mysqli_query($conn, "CREATE TABLE IF NOT EXISTS student (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(50),
-    course VARCHAR(50),
-    marks INT
+// CREATE TABLE
+mysqli_query($conn, "CREATE TABLE student(
+id INT AUTO_INCREMENT PRIMARY KEY,
+name VARCHAR(50),
+sem VARCHAR(20),
+email VARCHAR(50)
 )");
 
-// STEP 5: INSERT DATA
+// INSERT
 if (isset($_POST['submit'])) {
-    $name = $_POST['name'];
-    $course = $_POST['course'];
-    $marks = $_POST['marks'];
-
-    mysqli_query($conn, "INSERT INTO student (name, course, marks)
-                         VALUES ('$name', '$course', '$marks')");
-
-    echo "Data Inserted Successfully<br><br>";
+    mysqli_query($conn, "INSERT INTO student(name, sem, email)
+    VALUES('$_POST[name]','$_POST[sem]','$_POST[email]')");
 }
-?>
 
-<!-- FORM -->
-<form method="POST">
-    Name: <input type="text" name="name"><br><br>
-    Course: <input type="text" name="course"><br><br>
-    Marks: <input type="number" name="marks"><br><br>
-    <input type="submit" name="submit" value="Add Student">
-</form>
+// DELETE
+if (isset($_POST['delete'])) {
+    mysqli_query($conn, "DELETE FROM student WHERE id='$_POST[delete_id]'");
+}
 
-<hr>
-
-<h3>Student Records</h3>
-
-<?php
-// STEP 6: DISPLAY DATA
+// DISPLAY
 $result = mysqli_query($conn, "SELECT * FROM student");
 
+echo "<h3>Students:</h3>";
 while ($row = mysqli_fetch_assoc($result)) {
-    echo "ID: " . $row['id'] . " | ";
-    echo "Name: " . $row['name'] . " | ";
-    echo "Course: " . $row['course'] . " | ";
-    echo "Marks: " . $row['marks'] . "<br>";
+    echo "$row[id] | $row[name] | $row[sem] | $row[email] <br>";
 }
-
-// STEP 7: DROP TABLE (optional - only if needed)
-// mysqli_query($conn, "DROP TABLE student");
-
-mysqli_close($conn);
 ?>
+
+<html>
+
+<body>
+
+    <form method="POST">
+        Name: <input name="name"><br>
+        Sem: <input name="sem"><br>
+        Email: <input name="email"><br>
+        <input type="submit" name="submit" value="Insert">
+    </form>
+
+    <br>
+
+    <form method="POST">
+        ID: <input name="delete_id"><br>
+        <input type="submit" name="delete" value="Delete">
+    </form>
+
+</body>
+
+</html>
