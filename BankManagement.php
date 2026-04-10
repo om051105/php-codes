@@ -1,36 +1,45 @@
 <?php
-class Bank {
-    public $balance;
+// STEP 1: CONNECT TO MYSQL
+$conn = new mysqli("localhost", "root", "");
 
-    function __construct($initialBalance = 5000) {
-        if ($initialBalance < 5000) {
-            $this->balance = 5000;
-            echo "Minimum balance of 5000 required. Initialized with 5000.<br>";
-        } else {
-            $this->balance = $initialBalance;
-            echo "Account initialized with balance: " . $this->balance . "<br>";
-        }
-    }
-
-    function deposit($amount){
-        $this->balance = $this->balance + $amount;
-        echo "Deposited: " . $amount . "<br>";
-    }
-    function withdraw($amount){
-        if($amount <= $this->balance){
-            $this->balance = $this->balance - $amount;
-            echo "Withdrawn: " . $amount . "<br>";
-        } else {
-            echo "Insufficient Balance<br>";
-        }
-    }
-    function display(){
-        echo "Current Balance: " . $this->balance . "<br>";
-    }
+// CHECK CONNECTION
+if ($conn->connect_error) {
+    die("Connection Failed");
 }
 
-$account = new Bank(6000);
-$account->deposit(1000);
-$account->withdraw(300);
-$account->display();
+// STEP 2: CREATE DATABASE
+$conn->query("CREATE DATABASE IF NOT EXISTS company");
+
+// SELECT DATABASE
+$conn->select_db("company");
+
+// STEP 3: CREATE TABLE
+$conn->query("CREATE TABLE IF NOT EXISTS employee (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50),
+    department VARCHAR(50),
+    salary INT
+)");
+
+// STEP 4: INSERT DATA
+if (isset($_POST['submit'])) {
+    $name = $_POST['name'];
+    $dept = $_POST['department'];
+    $salary = $_POST['salary'];
+
+    $conn->query("INSERT INTO employee (name, department, salary)
+                  VALUES ('$name', '$dept', '$salary')");
+
+    echo "Data Inserted Successfully<br><br>";
+}
+?>
+
+<!-- FORM -->
+<form method="POST">
+    Name: <input type="text" name="name"><br><br>
+    Department: <input type="text" name="department"><br><br>
+    Salary: <input type="number" name="salary"><br><br>
+    <input type="submit" name="submit" value="Add Employee">
+</form>
+$conn->close();
 ?>
