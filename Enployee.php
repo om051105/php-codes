@@ -52,12 +52,6 @@ if (isset($_POST["delete"])) {
 
     <hr>
 
-    echo "<td>
-        <form method='POST'>
-            <input type='hidden' name='delete_id' value='".$row[' emp_id']."'>
-            <input type='submit' name='delete' value='Delete'>
-        </form>
-    </td>";
     <h2>Delete Employee</h2>
     <form method="POST">
         Enter ID: <input name="delete_id">
