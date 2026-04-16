@@ -94,25 +94,25 @@ function createTables($conn)
     mysqli_query(
         $conn,
         "CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(50),
-    password VARCHAR(50),
-    email VARCHAR(100)
-    )"
+id INT AUTO_INCREMENT PRIMARY KEY,
+username VARCHAR(50),
+password VARCHAR(50),
+email VARCHAR(100)
+)"
     );
 
     mysqli_query(
         $conn,
         "CREATE TABLE IF NOT EXISTS items (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    type ENUM('lost','found'),
-    item_name VARCHAR(100),
-    description TEXT,
-    location VARCHAR(100),
-    category VARCHAR(50),
-    reported_by VARCHAR(50),
-    reported_on DATE
-    )"
+id INT AUTO_INCREMENT PRIMARY KEY,
+type ENUM('lost','found'),
+item_name VARCHAR(100),
+description TEXT,
+location VARCHAR(100),
+category VARCHAR(50),
+reported_by VARCHAR(50),
+reported_on DATE
+)"
     );
 }
 
@@ -165,7 +165,7 @@ function registerUser($conn, $email, $username, $password)
     mysqli_query(
         $conn,
         "INSERT INTO users (username, password, email)
-    VALUES ('$username', '$password', '$email')"
+VALUES ('$username', '$password', '$email')"
     );
 
     return true;
@@ -178,7 +178,7 @@ function reportItem($conn, $type, $item_name, $description, $location, $category
     mysqli_query(
         $conn,
         "INSERT INTO items (type, item_name, description, location, category, reported_by, reported_on)
-    VALUES ('$type', '$item_name', '$description', '$location', '$category', '$reported_by', '$today')"
+VALUES ('$type', '$item_name', '$description', '$location', '$category', '$reported_by', '$today')"
     );
 }
 
@@ -281,7 +281,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         reportItem($conn, $type, $item_name, $description, $location, $category, $username);
 
         $message = "<p class='success-box'>Report submitted for: " . $item_label . ". <a href='?page=view'>View all items</a>
-    </p>";
+</p>";
     }
 }
 
@@ -421,7 +421,7 @@ $found_items = countItemsByType($conn, "found");
         }
 
         .btn-blue {
-            background: #abce0eff;
+            background: #007bff;
         }
 
         .btn-green {
