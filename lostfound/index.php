@@ -3,68 +3,227 @@ session_start();
 
 /*
 |--------------------------------------------------------------------------
-| Database setup
+| PHP GRAPHICS ENGINE (GD Library)
 |--------------------------------------------------------------------------
-| This project uses a very simple MySQL setup so beginners can understand
-| how the connection, database, and tables are created.
 */
-$conn = mysqli_connect("localhost", "root", "");
+if (isset($_GET['draw_badge'])) {
+    $type = $_GET['type'] ?? 'lost';
+    $text = strtoupper($type);
+    $scale = isset($_GET['scale']) ? (float) $_GET['scale'] : 1.0;
 
-if (!$conn) {
-    die("Database connection failed: " . mysqli_connect_error());
+    // 1. Creating the image (drawing a canvas)
+    $img = imagecreatetruecolor(120, 30);
+
+    // 2. Color handling
+    $white = imagecolorallocate($img, 255, 255, 255);
+    $red = imagecolorallocate($img, 220, 53, 69);
+    $green = imagecolorallocate($img, 40, 167, 69);
+    $bg_color = ($type == 'lost') ? $red : $green;
+
+    // 3. Drawing a filled rectangle
+    imagefilledrectangle($img, 0, 0, 120, 30, $bg_color);
+
+    // 4. Writing text on the image
+    imagestring($img, 4, 15, 7, $text, $white);
+
+    // 5. Scaling the image (Demonstration)
+    if ($scale != 1.0) {
+        $new_w = 120 * $scale;
+        $new_h = 30 * $scale;
+        $img = imagescale($img, $new_w, $new_h);
+    }
+
+    // 6. Output the image as PNG
+    header('Content-Type: image/png');
+    imagepng($img);
+    imagedestroy($img);
+    exit;
 }
 
-mysqli_query($conn, "CREATE DATABASE IF NOT EXISTS lostfound_db");
-mysqli_select_db($conn, "lostfound_db");
+/*
+|--------------------------------------------------------------------------
+| Lost and Found Portal - SINGLE FILE CONFIGURATION
+|--------------------------------------------------------------------------
+*/
 
-mysqli_query(
-    $conn,
-    "CREATE TABLE IF NOT EXISTS users (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        username VARCHAR(50),
-        password VARCHAR(50),
-        email VARCHAR(100)
-    )"
-);
+// 1. DATABASE CONFIGURATION (XAMPP Default)
+$db_host = "localhost";
+$db_user = "root";
+$db_pass = "";
+$db_name = "lostfound_db";
 
-mysqli_query(
-    $conn,
-    "CREATE TABLE IF NOT EXISTS items (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        type ENUM('lost','found'),
-        item_name VARCHAR(100),
-        description TEXT,
-        location VARCHAR(100),
-        category VARCHAR(50),
-        reported_by VARCHAR(50),
-        reported_on DATE
-    )"
-);
+class Item
+{
+    public $name;
+    public $category;
+    public $location;
 
-// Create a demo admin account if it does not exist.
-$admin_check = mysqli_query($conn, "SELECT * FROM users WHERE username='admin'");
-if (!mysqli_num_rows($admin_check)) {
+    public function __construct($name, $category, $location)
+    {
+        $this->name = $name;
+        $this->category = $category;
+        $this->location = $location;
+    }
+
+    public function getShortLabel()
+    {
+        return $this->name . " - " . $this->category;
+    }
+
+    public function __destruct()
+    {
+    }
+}
+
+function connectDatabase($host, $user, $pass, $db)
+{
+    $conn = mysqli_connect($host, $user, $pass);
+
+    if (!$conn) {
+        die("Database connection failed: " . mysqli_connect_error());
+    }
+
+    mysqli_query($conn, "CREATE DATABASE IF NOT EXISTS $db");
+    mysqli_select_db($conn, $db);
+
+    return $conn;
+}
+
+function createTables($conn)
+{
     mysqli_query(
         $conn,
-        "INSERT INTO users (username, password, email)
-         VALUES ('admin', 'admin123', 'admin@college.com')"
+        "CREATE TABLE IF NOT EXISTS users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50),
+    password VARCHAR(50),
+    email VARCHAR(100)
+    )"
+    );
+
+    mysqli_query(
+        $conn,
+        "CREATE TABLE IF NOT EXISTS items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    type ENUM('lost','found'),
+    item_name VARCHAR(100),
+    description TEXT,
+    location VARCHAR(100),
+    category VARCHAR(50),
+    reported_by VARCHAR(50),
+    reported_on DATE
+    )"
     );
 }
 
-/*
-|--------------------------------------------------------------------------
-| Page and session values
-|--------------------------------------------------------------------------
-*/
+function createDefaultAdmin($conn)
+{
+    $check = mysqli_query($conn, "SELECT * FROM users WHERE username='admin'");
+    if (!mysqli_num_rows($check)) {
+        mysqli_query($conn, "INSERT INTO users (username, password, email) VALUES ('admin', 'admin123', 'admin@college.com')");
+    }
+}
+
+function getCategories()
+{
+    return ["Electronics", "Wallet/Purse", "Books", "Keys", "Bag", "Other"];
+}
+
+function getNavigationLinks()
+{
+    return [
+        "dashboard" => "Home"
+    ];
+}
+
+function cleanText($conn, $text)
+{
+    $text = trim($text);
+    return mysqli_real_escape_string($conn, $text);
+}
+
+function makeTitle($page)
+{
+    $page = str_replace("_", " ", $page);
+    return ucwords($page);
+}
+
+function loginUser($conn, $username, $password)
+{
+    $query = "SELECT * FROM users WHERE username='$username' AND password='$password'";
+    return mysqli_query($conn, $query);
+}
+
+function registerUser($conn, $email, $username, $password)
+{
+    $check = mysqli_query($conn, "SELECT * FROM users WHERE username='$username'");
+
+    if (mysqli_num_rows($check)) {
+        return false;
+    }
+
+    mysqli_query(
+        $conn,
+        "INSERT INTO users (username, password, email)
+    VALUES ('$username', '$password', '$email')"
+    );
+
+    return true;
+}
+
+function reportItem($conn, $type, $item_name, $description, $location, $category, $reported_by)
+{
+    $today = date("Y-m-d");
+
+    mysqli_query(
+        $conn,
+        "INSERT INTO items (type, item_name, description, location, category, reported_by, reported_on)
+    VALUES ('$type', '$item_name', '$description', '$location', '$category', '$reported_by', '$today')"
+    );
+}
+
+function countItemsByType($conn, $type = "")
+{
+    if ($type == "") {
+        $query = "SELECT COUNT(*) AS total FROM items";
+    } else {
+        $query = "SELECT COUNT(*) AS total FROM items WHERE type='$type'";
+    }
+
+    $result = mysqli_query($conn, $query);
+    $row = mysqli_fetch_assoc($result);
+    return $row["total"];
+}
+
+function fetchAllItems($conn)
+{
+    return mysqli_query($conn, "SELECT * FROM items ORDER BY reported_on DESC, id DESC");
+}
+
+function buildOptions($items)
+{
+    $html = "";
+
+    foreach ($items as $item) {
+        $html .= "<option value='" . $item . "'>" . $item . "</option>";
+    }
+
+    return $html;
+}
+
+$conn = connectDatabase($db_host, $db_user, $db_pass, $db_name);
+createTables($conn);
+createDefaultAdmin($conn);
+
+$categories = getCategories();
+$nav_links = getNavigationLinks();
+$category_options = buildOptions($categories);
+
 $page = $_GET["page"] ?? "login";
 $message = "";
 $username = $_SESSION["username"] ?? null;
+$page_heading = makeTitle($page);
 
-/*
-|--------------------------------------------------------------------------
-| Simple page protection
-|--------------------------------------------------------------------------
-*/
 if ($page == "logout") {
     session_destroy();
     header("Location: ?page=login");
@@ -73,31 +232,22 @@ if ($page == "logout") {
 
 if ($username && $page == "login") {
     $page = "dashboard";
+    $page_heading = makeTitle($page);
 }
 
-if (
-    !$username &&
-    in_array($page, ["dashboard", "report_lost", "report_found", "view"])
-) {
+if (!$username && in_array($page, ["dashboard", "report_lost", "report_found", "view"])) {
     $page = "login";
+    $page_heading = makeTitle($page);
 }
 
-/*
-|--------------------------------------------------------------------------
-| Form handling
-|--------------------------------------------------------------------------
-*/
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if ($page == "login") {
-        $input_username = $_POST["username"];
-        $input_password = $_POST["password"];
+        $input_username = cleanText($conn, $_POST["username"]);
+        $input_password = cleanText($conn, $_POST["password"]);
 
-        $login_query = "SELECT * FROM users
-                        WHERE username='$input_username'
-                        AND password='$input_password'";
-        $result = mysqli_query($conn, $login_query);
+        $result = loginUser($conn, $input_username, $input_password);
 
-        if (mysqli_num_rows($result)) {
+        if (mysqli_num_rows($result) > 0) {
             $_SESSION["username"] = $input_username;
             header("Location: ?page=dashboard");
             exit;
@@ -107,58 +257,37 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 
     if ($page == "register") {
-        $email = $_POST["email"];
-        $new_username = $_POST["username"];
-        $new_password = $_POST["password"];
+        $email = cleanText($conn, $_POST["email"]);
+        $new_username = cleanText($conn, $_POST["username"]);
+        $new_password = cleanText($conn, $_POST["password"]);
 
-        $check_user = mysqli_query(
-            $conn,
-            "SELECT * FROM users WHERE username='$new_username'"
-        );
-
-        if (mysqli_num_rows($check_user)) {
-            $message = "<p class='error-box'>Username already exists.</p>";
+        if (registerUser($conn, $email, $new_username, $new_password)) {
+            $message = "<p class='success-box'>Registration successful. <a href='?page=login'>Login now</a></p>";
         } else {
-            mysqli_query(
-                $conn,
-                "INSERT INTO users (username, password, email)
-                 VALUES ('$new_username', '$new_password', '$email')"
-            );
-            $message = "<p class='success-box'>Registered successfully. <a href='?page=login'>Login here</a></p>";
+            $message = "<p class='error-box'>Username already exists.</p>";
         }
     }
 
     if ($page == "report_lost" || $page == "report_found") {
         $type = str_replace("report_", "", $page);
-        $item_name = $_POST["item_name"];
-        $description = $_POST["description"];
-        $location = $_POST["location"];
-        $category = $_POST["category"];
-        $today = date("Y-m-d");
+        $item_name = cleanText($conn, $_POST["item_name"]);
+        $description = cleanText($conn, $_POST["description"]);
+        $location = cleanText($conn, $_POST["location"]);
+        $category = cleanText($conn, $_POST["category"]);
 
-        mysqli_query(
-            $conn,
-            "INSERT INTO items (type, item_name, description, location, category, reported_by, reported_on)
-             VALUES ('$type', '$item_name', '$description', '$location', '$category', '$username', '$today')"
-        );
+        $item_object = new Item($item_name, $category, $location);
+        $item_label = $item_object->getShortLabel();
 
-        $message = "<p class='success-box'>Item reported successfully. <a href='?page=view'>View all items</a></p>";
+        reportItem($conn, $type, $item_name, $description, $location, $category, $username);
+
+        $message = "<p class='success-box'>Report submitted for: " . $item_label . ". <a href='?page=view'>View all items</a>
+    </p>";
     }
 }
 
-/*
-|--------------------------------------------------------------------------
-| Dropdown options
-|--------------------------------------------------------------------------
-*/
-$categories = "
-    <option>Electronics</option>
-    <option>Wallet/Purse</option>
-    <option>Books</option>
-    <option>Keys</option>
-    <option>Bag</option>
-    <option>Other</option>
-";
+$total_items = countItemsByType($conn);
+$lost_items = countItemsByType($conn, "lost");
+$found_items = countItemsByType($conn, "found");
 ?>
 
 <!DOCTYPE html>
@@ -167,249 +296,165 @@ $categories = "
 <head>
     <title>Lost and Found Portal</title>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-        }
-
         body {
-            background: #eef2f7;
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            margin: 0;
         }
 
         nav {
-            background: #1a1a2e;
-            color: white;
-            padding: 14px 25px;
+            background: #333;
+            color: #fff;
+            padding: 15px;
             display: flex;
             justify-content: space-between;
-            align-items: center;
         }
 
         nav a {
-            color: #d4d4d4;
+            color: #fff;
             text-decoration: none;
-            margin-left: 14px;
-            font-size: 14px;
+            margin-left: 15px;
         }
 
-        nav a:hover {
-            color: white;
-        }
-
-        .logout-btn {
-            background: #e74c3c;
-            color: white !important;
-            padding: 6px 12px;
-            border-radius: 5px;
+        .wrapper {
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 0 10px;
         }
 
         .box {
-            background: white;
-            max-width: 450px;
-            margin: 55px auto;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+            background: #fff;
+            padding: 25px;
+            margin: 40px auto;
+            max-width: 500px;
+            border: 1px solid #ddd;
         }
 
-        .box h2 {
-            color: #1a1a2e;
-            margin-bottom: 6px;
+        .stat-box,
+        .card {
+            background: #fff;
+            padding: 25px;
+            border: 1px solid #ddd;
+            flex: 1;
+            text-align: center;
+            text-decoration: none;
+            color: #333;
+            transition: 0.3s;
         }
 
-        .box p {
-            color: #777;
-            font-size: 13px;
-            margin-bottom: 18px;
+        .card:hover {
+            border-color: #007bff;
+            background: #fcfcfc;
+            transform: translateY(-3px);
+        }
+
+        .card b {
+            display: block;
+            font-size: 18px;
+            color: #007bff;
+            margin-bottom: 8px;
+        }
+
+        .btn-green-text {
+            color: #28a745 !important;
+        }
+
+        .btn-purple-text {
+            color: #6f42c1 !important;
+        }
+
+        .row {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            margin-top: 15px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background: #f8f8f8;
         }
 
         label {
             display: block;
-            margin-bottom: 5px;
-            font-size: 13px;
+            margin: 10px 0 5px;
             font-weight: bold;
-            color: #444;
         }
 
         input,
         select,
         textarea {
             width: 100%;
-            padding: 10px;
-            margin-bottom: 14px;
-            border: 1px solid #ddd;
-            border-radius: 7px;
-            font-size: 14px;
-        }
-
-        textarea {
-            min-height: 80px;
-            resize: vertical;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
         }
 
         button {
             width: 100%;
-            padding: 12px;
+            padding: 10px;
             border: none;
-            border-radius: 7px;
-            color: white;
-            font-size: 15px;
+            color: #fff;
             cursor: pointer;
         }
 
-        button:hover {
-            opacity: 0.9;
-        }
-
-        .btn-blue {
-            background: #0288d1;
-        }
-
-        .btn-green {
-            background: #27ae60;
-        }
-
-        .btn-red {
-            background: #e74c3c;
-        }
-
-        .error-box {
-            background: #ffe0e0;
-            color: #e74c3c;
-            padding: 10px;
-            border-radius: 7px;
-            margin-bottom: 12px;
-            font-size: 13px;
-        }
-
-        .success-box {
-            background: #e0f9e0;
-            color: #27ae60;
-            padding: 10px;
-            border-radius: 7px;
-            margin-bottom: 12px;
-            font-size: 13px;
-        }
-
-        .wrapper {
-            max-width: 950px;
-            margin: 35px auto;
-            padding: 0 18px;
-        }
-
-        .row {
-            display: flex;
-            gap: 18px;
-            margin: 18px 0;
-        }
-
-        .stat-box {
-            flex: 1;
-            background: white;
-            padding: 22px;
-            border-radius: 10px;
-            text-align: center;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
-        }
-
-        .stat-box b {
-            font-size: 34px;
-        }
-
-        .stat-box small {
-            display: block;
-            color: #888;
-            font-size: 13px;
-        }
-
-        .card {
-            flex: 1;
-            background: white;
-            border-radius: 10px;
-            padding: 25px 18px;
-            text-align: center;
-            text-decoration: none;
-            color: #1a1a2e;
-            border: 2px solid #eee;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
-        }
-
-        .card:hover {
-            border-color: #0288d1;
-        }
-
-        .card b {
-            display: block;
-            margin-bottom: 5px;
-        }
-
-        .card small {
-            color: #888;
-            font-size: 12px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.07);
-        }
-
-        th {
-            background: #1a1a2e;
-            color: white;
-            padding: 12px 13px;
-            text-align: left;
-            font-size: 13px;
-        }
-
-        td {
-            padding: 11px 13px;
-            border-bottom: 1px solid #f0f0f0;
-            font-size: 14px;
-            vertical-align: top;
-        }
-
         .badge-lost {
-            background: #ffe0e0;
-            color: #e74c3c;
-            padding: 3px 9px;
-            border-radius: 12px;
-            font-size: 12px;
+            color: #d9534f;
             font-weight: bold;
         }
 
         .badge-found {
-            background: #e0f9e0;
-            color: #27ae60;
-            padding: 3px 9px;
-            border-radius: 12px;
-            font-size: 12px;
+            color: #5cb85c;
             font-weight: bold;
         }
 
-        .muted {
-            color: #888;
+        .btn-blue {
+            background: #abce0eff;
         }
 
-        @media (max-width: 768px) {
-            nav {
-                flex-direction: column;
-                gap: 10px;
-                align-items: flex-start;
-            }
+        .btn-green {
+            background: #28a745;
+        }
 
+        .btn-red {
+            background: #dc3545;
+        }
+
+        .error-box {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            margin-bottom: 15px;
+        }
+
+        .badge-img {
+            height: 25px;
+            vertical-align: middle;
+            border-radius: 4px;
+        }
+
+        .graphics-demo {
+            background: #fff;
+            padding: 20px;
+            margin-top: 30px;
+            border-top: 2px solid #007bff;
+        }
+
+        @media (max-width: 600px) {
             .row {
                 flex-direction: column;
-            }
-
-            table {
-                display: block;
-                overflow-x: auto;
             }
         }
     </style>
@@ -421,10 +466,9 @@ $categories = "
         <nav>
             <b>Lost and Found Portal</b>
             <div>
-                <a href="?page=dashboard">Home</a>
-                <a href="?page=report_lost">Report Lost</a>
-                <a href="?page=report_found">Report Found</a>
-                <a href="?page=view">View Items</a>
+                <?php foreach ($nav_links as $link_page => $link_text): ?>
+                    <a href="?page=<?= $link_page ?>"><?= $link_text ?></a>
+                <?php endforeach; ?>
                 <a href="?page=logout" class="logout-btn">Logout</a>
             </div>
         </nav>
@@ -433,7 +477,7 @@ $categories = "
     <?php if ($page == "login"): ?>
         <div class="box">
             <h2>Lost and Found Portal</h2>
-            <p>Login to continue</p>
+            <p>Login to your account</p>
             <?= $message ?>
 
             <form method="POST">
@@ -449,15 +493,13 @@ $categories = "
             <br>
             <small>
                 <a href="?page=register">No account? Register</a>
-                |
-                Demo login: admin / admin123
             </small>
         </div>
 
     <?php elseif ($page == "register"): ?>
         <div class="box">
-            <h2>Create Account</h2>
-            <p>Register a new user</p>
+            <h2><?= $page_heading ?></h2>
+            <p>Create a new user account.</p>
             <?= $message ?>
 
             <form method="POST">
@@ -478,15 +520,11 @@ $categories = "
         </div>
 
     <?php elseif ($page == "dashboard"): ?>
-        <?php
-        $total_items = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS total FROM items"))["total"];
-        $lost_items = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS total FROM items WHERE type='lost'"))["total"];
-        $found_items = mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS total FROM items WHERE type='found'"))["total"];
-        ?>
-
         <div class="wrapper">
-            <h2>Welcome, <?= $username ?>!</h2>
-            <p class="muted">Manage lost and found reports here.</p>
+            <div class="heading">
+                <h2>Welcome, <?= $username ?>!</h2>
+                <p class="muted">Manage lost and found items.</p>
+            </div>
 
             <div class="row">
                 <div class="stat-box">
@@ -506,15 +544,12 @@ $categories = "
             <div class="row">
                 <a href="?page=report_lost" class="card">
                     <b>Report Lost Item</b>
-                    <small>I lost something</small>
                 </a>
                 <a href="?page=report_found" class="card">
-                    <b>Report Found Item</b>
-                    <small>I found something</small>
+                    <b class="btn-green-text">Report Found Item</b>
                 </a>
                 <a href="?page=view" class="card">
-                    <b>View All Items</b>
-                    <small>Check every report</small>
+                    <b class="btn-purple-text">View All Items</b>
                 </a>
             </div>
         </div>
@@ -523,13 +558,11 @@ $categories = "
         <?php
         $title = ($page == "report_lost") ? "Report Lost Item" : "Report Found Item";
         $button_class = ($page == "report_lost") ? "btn-red" : "btn-green";
-        $button_text = ($page == "report_lost") ? "Submit Lost Report" : "Submit Found Report";
-        $title_color = ($page == "report_lost") ? "#e74c3c" : "#27ae60";
         ?>
 
         <div class="box" style="max-width:520px;">
-            <h2 style="color:<?= $title_color ?>;"><?= $title ?></h2>
-            <p>Fill in the item details</p>
+            <h2><?= $title ?></h2>
+            <p>Fill in details of the item</p>
             <?= $message ?>
 
             <form method="POST">
@@ -538,22 +571,26 @@ $categories = "
 
                 <label>Category</label>
                 <select name="category">
-                    <?= $categories ?>
+                    <?= $category_options ?>
                 </select>
 
                 <label>Location</label>
-                <input type="text" name="location" placeholder="Example: Library or Canteen" required>
+                <input type="text" name="location" placeholder="Example: Library" required>
 
                 <label>Description</label>
-                <textarea name="description" placeholder="Write a short description of the item"></textarea>
+                <textarea name="description" placeholder="Write a short description"></textarea>
 
-                <button class="<?= $button_class ?>"><?= $button_text ?></button>
+                <button class="<?= $button_class ?>">Submit Report</button>
             </form>
         </div>
 
     <?php elseif ($page == "view"): ?>
         <div class="wrapper">
-            <h2>All Reported Items</h2>
+            <div class="heading">
+                <h2><?= $page_heading ?></h2>
+                <p class="muted">View all reported items.</p>
+            </div>
+
             <table>
                 <thead>
                     <tr>
@@ -568,19 +605,16 @@ $categories = "
                 </thead>
                 <tbody>
                     <?php
-                    $items_result = mysqli_query($conn, "SELECT * FROM items ORDER BY reported_on DESC");
+                    $items_result = fetchAllItems($conn);
                     $count = 1;
 
-                    if (mysqli_num_rows($items_result)) {
+                    if (mysqli_num_rows($items_result) > 0) {
                         while ($row = mysqli_fetch_assoc($items_result)) {
-                            $badge = $row["type"] == "lost"
-                                ? "<span class='badge-lost'>Lost</span>"
-                                : "<span class='badge-found'>Found</span>";
-
+                            $badge_url = "?draw_badge=1&type=" . $row["type"];
                             echo "<tr>";
                             echo "<td>" . $count . "</td>";
-                            echo "<td>" . $badge . "</td>";
-                            echo "<td><b>" . $row["item_name"] . "</b><br><small style='color:#999;'>" . $row["description"] . "</small></td>";
+                            echo "<td><img src='$badge_url' class='badge-img' alt='Badge'></td>";
+                            echo "<td><b>" . $row["item_name"] . "</b><br><small class='muted'>" . $row["description"] . "</small></td>";
                             echo "<td>" . $row["category"] . "</td>";
                             echo "<td>" . $row["location"] . "</td>";
                             echo "<td>" . $row["reported_by"] . "</td>";
@@ -589,13 +623,12 @@ $categories = "
                             $count++;
                         }
                     } else {
-                        echo "<tr><td colspan='7' style='text-align:center;padding:25px;color:#999;'>No items reported yet.</td></tr>";
+                        echo "<tr><td colspan='7' style='text-align:center;padding:25px;color:#777;'>No items reported yet.</td></tr>";
                     }
                     ?>
                 </tbody>
             </table>
-        </div>
-    <?php endif; ?>
+        <?php endif; ?>
 
 </body>
 
