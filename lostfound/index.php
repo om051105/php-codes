@@ -1,57 +1,41 @@
 <?php
 session_start();
 
-/*
-|--------------------------------------------------------------------------
-| PHP GRAPHICS ENGINE (GD Library)
-|--------------------------------------------------------------------------
-*/
 if (isset($_GET['draw_badge'])) {
     $type = $_GET['type'] ?? 'lost';
     $text = strtoupper($type);
     $scale = isset($_GET['scale']) ? (float) $_GET['scale'] : 1.0;
 
-    // 1. Creating the image (drawing a canvas)
     $img = imagecreatetruecolor(120, 30);
 
-    // 2. Color handling
     $white = imagecolorallocate($img, 255, 255, 255);
     $red = imagecolorallocate($img, 220, 53, 69);
     $green = imagecolorallocate($img, 40, 167, 69);
     $bg_color = ($type == 'lost') ? $red : $green;
 
-    // 3. Drawing a filled rectangle
     imagefilledrectangle($img, 0, 0, 120, 30, $bg_color);
 
-    // 4. Writing text on the image
     imagestring($img, 4, 15, 7, $text, $white);
 
-    // 5. Scaling the image (Demonstration)
     if ($scale != 1.0) {
         $new_w = 120 * $scale;
         $new_h = 30 * $scale;
         $img = imagescale($img, $new_w, $new_h);
     }
 
-    // 6. Output the image as PNG
     header('Content-Type: image/png');
     imagepng($img);
     imagedestroy($img);
     exit;
 }
 
-/*
-|--------------------------------------------------------------------------
-| Lost and Found Portal - SINGLE FILE CONFIGURATION
-|--------------------------------------------------------------------------
-*/
-
-// 1. DATABASE CONFIGURATION (XAMPP Default)
+// Configuration
 $db_host = "localhost";
 $db_user = "root";
 $db_pass = "";
 $db_name = "lostfound_db";
 
+// Object
 class Item
 {
     public $name;
@@ -75,6 +59,7 @@ class Item
     }
 }
 
+// Connect
 function connectDatabase($host, $user, $pass, $db)
 {
     $conn = mysqli_connect($host, $user, $pass);
@@ -89,33 +74,35 @@ function connectDatabase($host, $user, $pass, $db)
     return $conn;
 }
 
+// Tables
 function createTables($conn)
 {
     mysqli_query(
         $conn,
         "CREATE TABLE IF NOT EXISTS users (
-id INT AUTO_INCREMENT PRIMARY KEY,
-username VARCHAR(50),
-password VARCHAR(50),
-email VARCHAR(100)
-)"
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50),
+    password VARCHAR(50),
+    email VARCHAR(100)
+    )"
     );
 
     mysqli_query(
         $conn,
         "CREATE TABLE IF NOT EXISTS items (
-id INT AUTO_INCREMENT PRIMARY KEY,
-type ENUM('lost','found'),
-item_name VARCHAR(100),
-description TEXT,
-location VARCHAR(100),
-category VARCHAR(50),
-reported_by VARCHAR(50),
-reported_on DATE
-)"
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    type ENUM('lost','found'),
+    item_name VARCHAR(100),
+    description TEXT,
+    location VARCHAR(100),
+    category VARCHAR(50),
+    reported_by VARCHAR(50),
+    reported_on DATE
+    )"
     );
 }
 
+// Admin
 function createDefaultAdmin($conn)
 {
     $check = mysqli_query($conn, "SELECT * FROM users WHERE username='admin'");
@@ -124,11 +111,13 @@ function createDefaultAdmin($conn)
     }
 }
 
+// Categories
 function getCategories()
 {
     return ["Electronics", "Wallet/Purse", "Books", "Keys", "Bag", "Other"];
 }
 
+// Navigation
 function getNavigationLinks()
 {
     return [
@@ -136,24 +125,28 @@ function getNavigationLinks()
     ];
 }
 
+// Security
 function cleanText($conn, $text)
 {
     $text = trim($text);
     return mysqli_real_escape_string($conn, $text);
 }
 
+// Title
 function makeTitle($page)
 {
     $page = str_replace("_", " ", $page);
     return ucwords($page);
 }
 
+// Login
 function loginUser($conn, $username, $password)
 {
     $query = "SELECT * FROM users WHERE username='$username' AND password='$password'";
     return mysqli_query($conn, $query);
 }
 
+// Register
 function registerUser($conn, $email, $username, $password)
 {
     $check = mysqli_query($conn, "SELECT * FROM users WHERE username='$username'");
@@ -165,12 +158,13 @@ function registerUser($conn, $email, $username, $password)
     mysqli_query(
         $conn,
         "INSERT INTO users (username, password, email)
-VALUES ('$username', '$password', '$email')"
+    VALUES ('$username', '$password', '$email')"
     );
 
     return true;
 }
 
+// Report
 function reportItem($conn, $type, $item_name, $description, $location, $category, $reported_by)
 {
     $today = date("Y-m-d");
@@ -178,10 +172,11 @@ function reportItem($conn, $type, $item_name, $description, $location, $category
     mysqli_query(
         $conn,
         "INSERT INTO items (type, item_name, description, location, category, reported_by, reported_on)
-VALUES ('$type', '$item_name', '$description', '$location', '$category', '$reported_by', '$today')"
+    VALUES ('$type', '$item_name', '$description', '$location', '$category', '$reported_by', '$today')"
     );
 }
 
+// Counting
 function countItemsByType($conn, $type = "")
 {
     if ($type == "") {
@@ -195,11 +190,13 @@ function countItemsByType($conn, $type = "")
     return $row["total"];
 }
 
+// Fetch
 function fetchAllItems($conn)
 {
     return mysqli_query($conn, "SELECT * FROM items ORDER BY reported_on DESC, id DESC");
 }
 
+// Options
 function buildOptions($items)
 {
     $html = "";
@@ -281,7 +278,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         reportItem($conn, $type, $item_name, $description, $location, $category, $username);
 
         $message = "<p class='success-box'>Report submitted for: " . $item_label . ". <a href='?page=view'>View all items</a>
-</p>";
+    </p>";
     }
 }
 
